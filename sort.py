@@ -18,12 +18,12 @@ class Image:
 
         try:
             # BGR->HSV leads to more accurate results in my experience
-            self.data = cv2.cvtColor(cv2.imread(self.path), cv2.COLOR_BGR2HSV)
+            data = cv2.cvtColor(cv2.imread(self.path), cv2.COLOR_BGR2HSV)
         except cv2.error:
             raise argparse.ArgumentTypeError(f"invalid input image ({self.path})")
-        self.hist = [cv2.calcHist([self.data], [0], None, [256], (0, 256)),
-                     cv2.calcHist([self.data], [1], None, [256], (0, 256)),
-                     cv2.calcHist([self.data], [2], None, [256], (0, 256))]
+        self.hist = [cv2.calcHist([data], [0], None, [256], (0, 256)),
+                     cv2.calcHist([data], [1], None, [256], (0, 256)),
+                     cv2.calcHist([data], [2], None, [256], (0, 256))]
 
     def assign_label(self, label):
         """Assemble output path."""

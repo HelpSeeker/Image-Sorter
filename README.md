@@ -2,7 +2,7 @@
 
 Python script to sort images based on histogram similarity via OpenCV.
 
-Single-threaded, unoptimized and RAM hungry. But hey, at least it works.
+Single-threaded and unoptimized. But hey, at least it works.
 
 ## Usage
 
