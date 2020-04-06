@@ -11,10 +11,16 @@ class Image:
     """Hold all image-related information."""
 
     def __init__(self, path):
-        self.path = path
+        self.path = os.path.abspath(path)
         self.out = None
-        # BGR->HSV leads to more accurate results in my experience
-        self.data = cv2.cvtColor(cv2.imread(self.path), cv2.COLOR_BGR2HSV)
+        if not os.path.exists(self.path):
+            raise argparse.ArgumentTypeError(f"image doesn't exist ({self.path})")
+
+        try:
+            # BGR->HSV leads to more accurate results in my experience
+            self.data = cv2.cvtColor(cv2.imread(self.path), cv2.COLOR_BGR2HSV)
+        except cv2.error:
+            raise argparse.ArgumentTypeError(f"invalid input image ({self.path})")
         self.hist = [cv2.calcHist([self.data], [0], None, [256], (0, 256)),
                      cv2.calcHist([self.data], [1], None, [256], (0, 256)),
                      cv2.calcHist([self.data], [2], None, [256], (0, 256))]
@@ -24,7 +30,7 @@ class Image:
         in_name = os.path.basename(self.path)
         out_name = f"{label}_{in_name}"
 
-        self.out = os.path.join(OPTS.out_dir, out_name)
+        self.out = os.path.join(opts.out_dir, out_name)
 
     def copy(self):
         """Copy file with new label to output directory."""
@@ -34,7 +40,7 @@ class Image:
 def parse_cli():
     """Parse the command line."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("images", metavar="image", type=os.path.abspath,
+    parser.add_argument("images", metavar="image", type=Image,
                         nargs="+", help="input images to sort")
     parser.add_argument("-p", "--path", dest="out_dir", type=os.path.abspath,
                         metavar="PATH", default=os.path.join(os.getcwd(), "sorted"),
@@ -60,28 +66,26 @@ def similarity(img1, img2):
 
 def main():
     """Run the main function body."""
-    images = [Image(path) for path in OPTS.images]
-
     # Brute-force closest pair of points problem (only with higher score = closer)
     # https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
-    for i in range(len(images)-1):
+    for i in range(len(opts.images)-1):
         max_score = 0
         max_img = i+1
-        for j in range(i+1, len(images)):
-            score = similarity(images[i], images[j])
+        for j in range(i+1, len(opts.images)):
+            score = similarity(opts.images[i], opts.images[j])
             if score > max_score:
                 max_score = score
                 max_img = j
-        images[i+1], images[max_img] = images[max_img], images[i+1]
+        opts.images[i+1], opts.images[max_img] = opts.images[max_img], opts.images[i+1]
 
     # Create output directory
-    if not os.path.exists(OPTS.out_dir):
-        os.mkdir(OPTS.out_dir)
+    if not os.path.exists(opts.out_dir):
+        os.mkdir(opts.out_dir)
 
-    # Copy images based on their new sorting
+    # Copy opts.images based on their new sorting
     label = 1
-    width = len(str(len(images)))
-    for img in images:
+    width = len(str(len(opts.images)))
+    for img in opts.images:
         img.assign_label(f"{label:0{width}}")   # Pad sort number with zeros
         img.copy()
         label += 1
@@ -89,7 +93,7 @@ def main():
 
 if __name__ == '__main__':
     try:
-        OPTS = parse_cli()
+        opts = parse_cli()
         main()
     except KeyboardInterrupt:
         print("\nUser interrupt!")
