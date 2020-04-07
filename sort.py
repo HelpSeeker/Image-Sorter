@@ -20,6 +20,10 @@ class Image:
         self.hist = [cv2.calcHist([data], [0], None, [256], (0, 256)),
                      cv2.calcHist([data], [1], None, [256], (0, 256)),
                      cv2.calcHist([data], [2], None, [256], (0, 256))]
+        # Normalizing the histograms leads to more accurate results for (large)
+        # dimension differences for chi-square and intersection comparisons
+        # The L1 norm performed the best in my tests
+        self.hist = [cv2.normalize(h, h, norm_type=cv2.NORM_L1) for h in self.hist]
 
     def assign_label(self, label):
         """Assemble output path."""
