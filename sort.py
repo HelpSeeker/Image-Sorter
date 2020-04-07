@@ -4,6 +4,7 @@
 import argparse
 import os
 import shutil
+import sys
 
 import cv2
 
@@ -32,8 +33,8 @@ class Image:
         shutil.copy(self.path, self.out)
 
 
-def valid_image(string):
-    """Return absolute path for supported image formats."""
+def valid_image(img):
+    """Check input for existence and support."""
     # List of potentially supported image formats (varies across systems)
     # https://docs.opencv.org/4.3.0/d4/da8/group__imgcodecs.html#ga288b8b3da0892bd651fce07b3bbd3a56
     supported = (
@@ -50,24 +51,31 @@ def valid_image(string):
         ".hdr", ".pic",                          # Radiance HDR
     )
 
-    img = os.path.abspath(string)
+    valid = True
     ext = os.path.splitext(img)[1]
     if not os.path.exists(img):
-        raise argparse.ArgumentTypeError(f"image doesn't exist ({img})")
-    if not (os.path.isfile(img) and ext in supported):
-        raise argparse.ArgumentTypeError(f"invalid input image ({img})")
+        print(f"{img}: image doesn't exist")
+        valid = False
+    elif not (os.path.isfile(img) and ext in supported):
+        print(f"{img}: invalid input image")
+        valid = False
 
-    return img
+    if not (valid or opts.ignore_errors):
+        sys.exit(1)
+
+    return valid
 
 
 def parse_cli():
     """Parse the command line."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("images", metavar="image", type=valid_image,
+    parser.add_argument("images", metavar="image", type=os.path.abspath,
                         nargs="+", help="input images to sort")
     parser.add_argument("-p", "--path", dest="out_dir", type=os.path.abspath,
                         metavar="PATH", default=os.path.join(os.getcwd(), "sorted"),
                         help="output directory for sorted images")
+    parser.add_argument("-i", "--ignore-errors", action="store_true",
+                        help="ignore invalid input file errors")
 
     return parser.parse_args()
 
@@ -91,7 +99,7 @@ def similarity(img1, img2):
 
 def main():
     """Run the main function body."""
-    images = [Image(img) for img in opts.images]
+    images = [Image(img) for img in opts.images if valid_image(img)]
     # Brute-force closest pair of points problem (only with higher score = closer)
     # https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
     for i in range(len(images)-1):
