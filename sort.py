@@ -6,6 +6,8 @@ import os
 import shutil
 import sys
 
+from concurrent.futures import ProcessPoolExecutor
+
 import cv2
 
 class Image:
@@ -70,6 +72,18 @@ def valid_image(img):
     return valid
 
 
+def positive_int(string):
+    """Convert string provided by parse_cli() to a positive int."""
+    try:
+        value = int(string)
+        if value <= 0:
+            raise ValueError
+    except ValueError:
+        raise argparse.ArgumentTypeError("invalid positive int")
+
+    return value
+
+
 def parse_cli():
     """Parse the command line."""
     parser = argparse.ArgumentParser()
@@ -77,7 +91,9 @@ def parse_cli():
                         nargs="+", help="input images to sort")
     parser.add_argument("-p", "--path", dest="out_dir", type=os.path.abspath,
                         metavar="PATH", default=os.path.join(os.getcwd(), "sorted"),
-                        help="output directory for sorted images")
+                        help="output directory for sorted images (def: ./sorted)")
+    parser.add_argument("-t", "--threads", type=positive_int, default=1, metavar="N",
+                        help="how many images to read in parallel (def: 1)")
     parser.add_argument("-i", "--ignore-errors", action="store_true",
                         help="ignore invalid input file errors")
 
@@ -103,7 +119,13 @@ def similarity(img1, img2):
 
 def main():
     """Run the main function body."""
-    images = [Image(img) for img in opts.images if valid_image(img)]
+    images = [i for i in opts.images if valid_image(i)]
+    if opts.threads > 1:
+        with ProcessPoolExecutor(max_workers=opts.threads) as executor:
+            images = [*executor.map(Image, images)]
+    else:
+        images = [Image(i) for i in images]
+
     # Brute-force closest pair of points problem (only with higher score = closer)
     # https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
     for i in range(len(images)-1):

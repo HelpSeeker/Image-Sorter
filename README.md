@@ -2,19 +2,20 @@
 
 Python script to sort images based on histogram similarity via OpenCV.
 
-Single-threaded and unoptimized. But hey, at least it works.
+The sorting algorithm is unoptimized, but otherwise it works pretty well.
 
 ## Usage
 
 ```
-usage: sort.py [-h] [-p PATH] [-i] image [image ...]
+usage: sort.py [-h] [-p PATH] [-t N] [-i] image [image ...]
 
 positional arguments:
   image                 input images to sort
 
 optional arguments:
   -h, --help            show this help message and exit
-  -p PATH, --path PATH  output directory for sorted images
+  -p PATH, --path PATH  output directory for sorted images (def: ./sorted)
+  -t N, --threads N     how many images to read in parallel (def: 1)
   -i, --ignore-errors   ignore invalid input file errors
 ```
 
