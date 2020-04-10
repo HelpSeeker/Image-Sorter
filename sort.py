@@ -42,10 +42,11 @@ class DefaultOptions:
 
     # OpenCV histogram comparison methods
     # https://docs.opencv.org/master/d6/dc7/group__imgproc__hist.html#ga994f53817d621e2e4228fc646342d386
-    # IMPORTANT:
-    #   Correlation, Intersection           -> higher = more similar
-    #   Chi-Square,  Bhattacharyya distance -> lower  = more similar (more akin to distance)
-    COMP_METHOD = cv2.HISTCMP_INTERSECT
+    #   Correlation:             0 or cv2.HISTCMP_CORREL
+    #   Chi-Square:              1 or cv2.HISTCMP_CHISQR
+    #   Intersection:            2 or cv2.HISTCMP_INTERSECT
+    #   Bhattacharyya distance:  3 or cv2.HISTCMP_BHATTACHARYYA
+    COMP_METHOD = 2
 
 
 class Image:
@@ -149,6 +150,30 @@ def parse_cli():
     return parser.parse_args()
 
 
+def sort(images):
+    """Sort images by histogram similarity."""
+    # Brute-force closest pair of points problem (only with higher score = closer)
+    # https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
+    for i in range(len(images)-1):
+        best_score = 0
+        best_img = i+1
+        for j in range(i+1, len(images)):
+            score = cv2.compareHist(images[i].hist, images[j].hist, opts.comp_method)
+            if opts.comp_method in {0, 2}:
+                # Correlation, Intersection -> higher = more similar
+                if score > best_score:
+                    best_score = score
+                    best_img = j
+            else:
+                # Chi-Square, Bhattacharyya distance -> lower = more similar
+                if score < best_score:
+                    best_score = score
+                    best_img = j
+        images[i+1], images[best_img] = images[best_img], images[i+1]
+
+    return images
+
+
 def main():
     """Run the main function body."""
     images = [i for i in opts.images if valid_image(i)]
@@ -158,17 +183,7 @@ def main():
     else:
         images = [Image(i) for i in images]
 
-    # Brute-force closest pair of points problem (only with higher score = closer)
-    # https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
-    for i in range(len(images)-1):
-        max_score = 0
-        max_img = i+1
-        for j in range(i+1, len(images)):
-            score = cv2.compareHist(images[i].hist, images[j].hist, opts.comp_method)
-            if score > max_score:
-                max_score = score
-                max_img = j
-        images[i+1], images[max_img] = images[max_img], images[i+1]
+    images = sort(images)
 
     # Create output directory
     if not os.path.exists(opts.out_dir):
