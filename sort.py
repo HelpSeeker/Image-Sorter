@@ -155,7 +155,10 @@ def sort(images):
     # Brute-force closest pair of points problem (only with higher score = closer)
     # https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
     for i in range(len(images)-1):
-        best_score = 0
+        if opts.comp_method in {0, 2}:
+            best_score = 0
+        else:
+            best_score = float("inf")
         best_img = i+1
         for j in range(i+1, len(images)):
             score = cv2.compareHist(images[i].hist, images[j].hist, opts.comp_method)
