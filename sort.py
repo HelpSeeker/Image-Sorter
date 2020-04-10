@@ -18,6 +18,12 @@ class DefaultOptions:
     # Output directory for the sorted images
     PATH = os.path.join(os.getcwd(), "sorted")
 
+    # Number of bins used for histogram computation
+    #   Low numbers  -> less prone to small differences (e.g added background)
+    #   High numbers -> less prone to color shifts or cropping
+    # Recommended: 10-50
+    BINS = 10
+
     # Max. number of processes (!) for image reading/histogram calculation
     THREADS = 1
 
@@ -26,7 +32,8 @@ class DefaultOptions:
 
     ### Advanced Options ###
     CHANNELS = [0, 1, 2]
-    BINS = [10, 10, 10]
+    # OpenCV uses 0-179 as Hue range, but 0-255 gives me better results somehow
+    # Also makes it easier to switch between BGR and HSV input
     RANGE = [0, 256, 0, 256, 0, 256]
 
     # OpenCV normalization methods for histogram normalization
@@ -50,7 +57,8 @@ class Image:
 
         # BGR->HSV leads to more accurate results in my experience
         data = cv2.cvtColor(cv2.imread(self.path), cv2.COLOR_BGR2HSV)
-        self.hist = cv2.calcHist([data], opts.channels, None, opts.bins, opts.range)
+        self.hist = cv2.calcHist([data], opts.channels, None,
+                                 [opts.bins, opts.bins, opts.bins], opts.range)
         # Normalizing the histograms leads to more accurate results
         self.hist = cv2.normalize(self.hist, self.hist, norm_type=opts.norm)
 
@@ -121,16 +129,18 @@ def parse_cli():
     parser.add_argument("-p", "--path", dest="out_dir", type=os.path.abspath,
                         metavar="PATH", default=defaults.PATH,
                         help="output directory for sorted images (def: ./sorted)")
+    parser.add_argument("-b", "--bins", type=positive_int,
+                        metavar="N", default=defaults.BINS,
+                        help="number of bins for histogram computation (def: %(default)s)")
     parser.add_argument("-t", "--threads", type=positive_int,
                         default=defaults.THREADS, metavar="N",
-                        help="how many images to read in parallel (def: 1)")
+                        help="max. number of processes to use (def: %(default)s)")
     parser.add_argument("-i", "--ignore-errors", action="store_true",
                         default=defaults.IGNORE_ERRORS,
                         help="ignore invalid input file errors")
 
     parser.set_defaults(
         channels=defaults.CHANNELS,
-        bins=defaults.BINS,
         range=defaults.RANGE,
         norm=defaults.NORM,
         comp_method=defaults.COMP_METHOD,
