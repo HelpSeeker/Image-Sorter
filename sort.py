@@ -25,8 +25,9 @@ class DefaultOptions:
     IGNORE_ERRORS = False
 
     ### Advanced Options ###
-    BINS = [256]
-    RANGE = [0, 256]
+    CHANNELS = [0, 1, 2]
+    BINS = [10, 10, 10]
+    RANGE = [0, 256, 0, 256, 0, 256]
 
     # OpenCV normalization methods for histogram normalization
     # https://docs.opencv.org/master/d2/de8/group__core__array.html#gad12cefbcb5291cf958a85b4b67b6149f
@@ -49,11 +50,9 @@ class Image:
 
         # BGR->HSV leads to more accurate results in my experience
         data = cv2.cvtColor(cv2.imread(self.path), cv2.COLOR_BGR2HSV)
-        self.hist = [cv2.calcHist([data], [0], None, opts.bins, opts.range),
-                     cv2.calcHist([data], [1], None, opts.bins, opts.range),
-                     cv2.calcHist([data], [2], None, opts.bins, opts.range)]
+        self.hist = cv2.calcHist([data], opts.channels, None, opts.bins, opts.range)
         # Normalizing the histograms leads to more accurate results
-        self.hist = [cv2.normalize(h, h, norm_type=opts.norm) for h in self.hist]
+        self.hist = cv2.normalize(self.hist, self.hist, norm_type=opts.norm)
 
     def assign_label(self, label):
         """Assemble output path."""
@@ -130,6 +129,7 @@ def parse_cli():
                         help="ignore invalid input file errors")
 
     parser.set_defaults(
+        channels=defaults.CHANNELS,
         bins=defaults.BINS,
         range=defaults.RANGE,
         norm=defaults.NORM,
@@ -137,15 +137,6 @@ def parse_cli():
     )
 
     return parser.parse_args()
-
-
-def similarity(img1, img2):
-    """Calculate histogram difference between 2 images."""
-    score = cv2.compareHist(img1.hist[0], img2.hist[0], opts.comp_method) + \
-            cv2.compareHist(img1.hist[1], img2.hist[1], opts.comp_method) + \
-            cv2.compareHist(img1.hist[2], img2.hist[2], opts.comp_method)
-
-    return score
 
 
 def main():
@@ -163,7 +154,7 @@ def main():
         max_score = 0
         max_img = i+1
         for j in range(i+1, len(images)):
-            score = similarity(images[i], images[j])
+            score = cv2.compareHist(images[i].hist, images[j].hist, opts.comp_method)
             if score > max_score:
                 max_score = score
                 max_img = j
