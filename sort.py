@@ -10,6 +10,36 @@ from concurrent.futures import ProcessPoolExecutor
 
 import cv2
 
+
+class DefaultOptions:
+    """Define and store all import user settings."""
+
+    ### Common options ###
+    # Output directory for the sorted images
+    PATH = os.path.join(os.getcwd(), "sorted")
+
+    # Max. number of processes (!) for image reading/histogram calculation
+    THREADS = 1
+
+    # Whether to ignore invalid input files
+    IGNORE_ERRORS = False
+
+    ### Advanced Options ###
+    BINS = [256]
+    RANGE = [0, 256]
+
+    # OpenCV normalization methods for histogram normalization
+    # https://docs.opencv.org/master/d2/de8/group__core__array.html#gad12cefbcb5291cf958a85b4b67b6149f
+    NORM = cv2.NORM_L1
+
+    # OpenCV histogram comparison methods
+    # https://docs.opencv.org/master/d6/dc7/group__imgproc__hist.html#ga994f53817d621e2e4228fc646342d386
+    # IMPORTANT:
+    #   Correlation, Intersection           -> higher = more similar
+    #   Chi-Square,  Bhattacharyya distance -> lower  = more similar (more akin to distance)
+    COMP_METHOD = cv2.HISTCMP_INTERSECT
+
+
 class Image:
     """Hold all image-related information."""
 
@@ -19,13 +49,11 @@ class Image:
 
         # BGR->HSV leads to more accurate results in my experience
         data = cv2.cvtColor(cv2.imread(self.path), cv2.COLOR_BGR2HSV)
-        self.hist = [cv2.calcHist([data], [0], None, [256], (0, 256)),
-                     cv2.calcHist([data], [1], None, [256], (0, 256)),
-                     cv2.calcHist([data], [2], None, [256], (0, 256))]
-        # Normalizing the histograms leads to more accurate results for (large)
-        # dimension differences for chi-square and intersection comparisons
-        # The L1 norm performed the best in my tests
-        self.hist = [cv2.normalize(h, h, norm_type=cv2.NORM_L1) for h in self.hist]
+        self.hist = [cv2.calcHist([data], [0], None, opts.bins, opts.range),
+                     cv2.calcHist([data], [1], None, opts.bins, opts.range),
+                     cv2.calcHist([data], [2], None, opts.bins, opts.range)]
+        # Normalizing the histograms leads to more accurate results
+        self.hist = [cv2.normalize(h, h, norm_type=opts.norm) for h in self.hist]
 
     def assign_label(self, label):
         """Assemble output path."""
@@ -86,33 +114,36 @@ def positive_int(string):
 
 def parse_cli():
     """Parse the command line."""
+    defaults = DefaultOptions()
+
     parser = argparse.ArgumentParser()
     parser.add_argument("images", metavar="image", type=os.path.abspath,
                         nargs="+", help="input images to sort")
     parser.add_argument("-p", "--path", dest="out_dir", type=os.path.abspath,
-                        metavar="PATH", default=os.path.join(os.getcwd(), "sorted"),
+                        metavar="PATH", default=defaults.PATH,
                         help="output directory for sorted images (def: ./sorted)")
-    parser.add_argument("-t", "--threads", type=positive_int, default=1, metavar="N",
+    parser.add_argument("-t", "--threads", type=positive_int,
+                        default=defaults.THREADS, metavar="N",
                         help="how many images to read in parallel (def: 1)")
     parser.add_argument("-i", "--ignore-errors", action="store_true",
+                        default=defaults.IGNORE_ERRORS,
                         help="ignore invalid input file errors")
+
+    parser.set_defaults(
+        bins=defaults.BINS,
+        range=defaults.RANGE,
+        norm=defaults.NORM,
+        comp_method=defaults.COMP_METHOD,
+    )
 
     return parser.parse_args()
 
 
 def similarity(img1, img2):
     """Calculate histogram difference between 2 images."""
-    # OpenCV histogram comparison methods
-    # https://docs.opencv.org/4.3.0/d8/dc8/tutorial_histogram_comparison.html
-    #   0: Correlation
-    #   1: Chi-Square
-    #   2: Intersection
-    #   3: Bhattacharyya distance
-    # IMPORTANT: 0,2 -> higher = more similar
-    #            1,3 -> lower  = more similar (more akin to distance)
-    score = cv2.compareHist(img1.hist[0], img2.hist[0], 2) + \
-            cv2.compareHist(img1.hist[1], img2.hist[1], 2) + \
-            cv2.compareHist(img1.hist[2], img2.hist[2], 2)
+    score = cv2.compareHist(img1.hist[0], img2.hist[0], opts.comp_method) + \
+            cv2.compareHist(img1.hist[1], img2.hist[1], opts.comp_method) + \
+            cv2.compareHist(img1.hist[2], img2.hist[2], opts.comp_method)
 
     return score
 
